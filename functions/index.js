@@ -55,12 +55,30 @@ const FBAuth = (req, res, next) => {
         console.error('No token found')
         return res.status(403).json({error: 'Unauthorized'})
     }
+
+    admin.auth().verifyIdToken(idToken)
+    .then(decodedToken => {
+        req.user = decodedToken
+        console.log(decodedToken)
+        return db.collection('users')
+            .where('userId', '==', req.user.uid)
+            .limit(1)
+            .get()
+    })
+    .then(data => {
+        req.user.handle = data.docs[0].data().handle;
+        return next();
+    })
+    .catch(err => {
+        console.log('Error while verifying token', err);
+        return res.status(403).json(err);
+    })
 }
 
 app.post('/scream', FBAuth, (request, response) => {
   const newScream = {
       body: request.body.body,
-      userHandle: request.body.userHandle,  
+      userHandle: request.user.handle,  
       createdAt: new Date().toISOString()
   };
 
