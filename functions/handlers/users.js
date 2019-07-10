@@ -4,6 +4,8 @@ const config = require('../util/config')
 firebase.initializeApp(config)
 const {validateSignUpData, validateLoginData} = require('../util/validators')
 
+
+
 exports.signup = (req, res) => {
     const newUser = {
         email: req.body.email,
@@ -85,18 +87,20 @@ exports.login = (req, res) => {
 }
 
 exports.uploadImage = (req, res) => {
+    const BusBoy = require("busboy")
+    if (req.method !== "POST") {
+        // Return a "method not allowed" error
+        return res.status(405).end();
+      }
 
-    
-
-    const BusBoy = require('busboy')
+    const busboy = new BusBoy({headers: req.headers});
     const path = require('path')
     const os = require('os')
     const fs = require('fs')
-    
-    const busboy = new BusBoy({headers: req.headers})
 
-    let imageFileName;
+   
     let imageToBeUploaded = {}
+    let imageFileName
 
     busboy.on("error", function(err) {
         console.log("BUSBOY ERROR CATCH:", err);
@@ -108,21 +112,23 @@ exports.uploadImage = (req, res) => {
       return res.status(400).json({ error: 'Wrong file type submitted' });
     }
 
-        console.log(fieldname);
-        console.log(filename);
-        console.log(mimetype);
+    file.on("error", function(err) {
+        console.log("FS_STREAM ERROR CATCH:", err);
+      });
+
         //image.png ...splitting the string by dots to pull file type
         const imageExtension = filename.split('.')[filename.split('.').length - 1] //index of last item png
-        const imageFileName = `${Math.round(
-            Math.random() * 100000000000
-          )}.${imageExtension}`; //23423423423.png
+        imageFileName = `${Math.round(
+            Math.random() * 1000000000000
+          ).toString()}.${imageExtension}`;
+          console.log(imageFileName)
+
         const filepath = path.join(os.tmpdir(), imageFileName);
         imageToBeUploaded= { filepath, mimetype}
         const writeStream = fs.createWriteStream(filepath);
         file.pipe(writeStream) //this creates the file
-        writeStream.on('error', (err) => console.log("WRITE_STREAM ERROR CATCH:", err));
-        
-        
+        file.on('error', (err) => console.log("WRITE_STREAM ERROR CATCH:", err));
+  
     })
 
     busboy.on('finish', () => { //finisher method 
@@ -139,7 +145,7 @@ exports.uploadImage = (req, res) => {
         .then(() => {
             const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${
           config.storageBucket
-        }/o/${imageFileName}?alt=media`;
+        }/o/${imageFileName}?alt=media`
             return db.doc(`/users/${req.user.handle}`).update({imageUrl: imageUrl});
         })
         .then(() =>{
