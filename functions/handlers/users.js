@@ -1,4 +1,4 @@
-const {db, admin} = require('../util/admin')
+const {db, admin, storage} = require('../util/admin')
 const firebase = require('firebase')
 const config = require('../util/config')
 firebase.initializeApp(config)
@@ -16,12 +16,12 @@ exports.signup = (req, res) => {
 
     if(!valid) return res.status(400).json(errors);
 
-    const noImg ='no-image.png'
+    const noImg ='no-img.png'
 
     //validation ^
     let token, userId
     db.doc(`/users/${newUser.handle}`).get()
-    .then(doc => {
+    .then((doc) => {
         if(doc.exists){
             return res.status(400).json({handle: 'this handle is already taken'})
         } else {
@@ -48,7 +48,7 @@ exports.signup = (req, res) => {
     .then(() => {
         return res.status(201).json({ token });
     })
-    .catch(err => {
+    .catch((err) => {
         console.error(err)
         if(err.code === 'auth/email-already-in-use'){
             return res.status(400).json({email: "Email is already in use"})
@@ -69,13 +69,13 @@ exports.login = (req, res) => {
     if(!valid) return res.status(400).json(errors);
 
     firebase.auth().signInWithEmailAndPassword(user.email.trim(), user.password)
-    .then(data => {
+    .then((data) => {
         return data.user.getIdToken();
     })
-    .then(token => {
+    .then((token) => {
         return res.json({token})
     })
-    .catch(err => {
+    .catch((err) => {
         console.error(err)
         if(err.code === 'auth/wrong-password'){
         return res.status(403).json({general: 'Wrong credentials please try again'})
@@ -85,29 +85,50 @@ exports.login = (req, res) => {
 }
 
 exports.uploadImage = (req, res) => {
+
+    
+
     const BusBoy = require('busboy')
     const path = require('path')
     const os = require('os')
-    const fs = require('fs');
+    const fs = require('fs')
     
     const busboy = new BusBoy({headers: req.headers})
 
     let imageFileName;
     let imageToBeUploaded = {}
 
+    busboy.on("error", function(err) {
+        console.log("BUSBOY ERROR CATCH:", err);
+      });
+
     busboy.on('file', (fieldname, file, filename, encoding, mimetype)=>{
+
+        if (mimetype !== 'image/jpeg' && mimetype !== 'image/png') {
+      return res.status(400).json({ error: 'Wrong file type submitted' });
+    }
+
         console.log(fieldname);
         console.log(filename);
         console.log(mimetype);
         //image.png ...splitting the string by dots to pull file type
         const imageExtension = filename.split('.')[filename.split('.').length - 1] //index of last item png
-        const imageFileName = `${Math.round(Math.random() * 100000)}${imageExtension}` //23423423423.png
-        const filePath = path.join(os.tmpdir(), imageFileName);
+        const imageFileName = `${Math.round(
+            Math.random() * 100000000000
+          )}.${imageExtension}`; //23423423423.png
+        const filepath = path.join(os.tmpdir(), imageFileName);
         imageToBeUploaded= { filepath, mimetype}
-        file.pipe(fs.createWriteStream(filepath)) //this creates the file
+        const writeStream = fs.createWriteStream(filepath);
+        file.pipe(writeStream) //this creates the file
+        writeStream.on('error', (err) => console.log("WRITE_STREAM ERROR CATCH:", err));
+        
+        
     })
+
     busboy.on('finish', () => { //finisher method 
-        admin.storage().bucket().upload(imageToBeUploaded.filepath, {
+        storage
+        .bucket(config.storageBucket)
+        .upload(imageToBeUploaded.filepath, {
             resumable: false,
             metadata: {
                 metadata: {
@@ -116,15 +137,18 @@ exports.uploadImage = (req, res) => {
             }
         }) 
         .then(() => {
-            const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/${imageFileName}?alt=media`
+            const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${
+          config.storageBucket
+        }/o/${imageFileName}?alt=media`;
             return db.doc(`/users/${req.user.handle}`).update({imageUrl: imageUrl});
         })
         .then(() =>{
             return res.json({message: 'image uploaded successfully'})
         })
-        .catch(err =>{
+        .catch((err) =>{
             console.error(err)
             return res.status(500).json({error: err.code})
         })
-    })
+    });
+    busboy.end(req.rawBody);
 }
