@@ -1,4 +1,4 @@
-const {db, admin} = require('../util/admin')
+const { db } = require('../util/admin')
 
 exports.getAllScreams = (request, response) => {
     db
@@ -39,9 +39,7 @@ exports.postOneScream = (request, response) => {
           console.error(err);
       })
   }
-
- 
-exports.getScream = (req, res) => {
+  exports.getScream = (req, res) => {
     let screamData = {};
     db.doc(`/screams/${req.params.screamId}`)
       .get()
@@ -51,25 +49,36 @@ exports.getScream = (req, res) => {
         }
         screamData = doc.data();
         screamData.screamId = doc.id;
+        console.log(screamData.screamId)
         return db
           .collection('comments')
-          //.orderBy('createdAt', 'desc')
-          .where('screamId', '==', req.params.screamId)
-          .get()
-          console.log(db.collection('comments'))
+          .where('screamId', '==', screamData.screamId)
+          .get();
       })
-
-      .then(data => {
+      .then((data) => {
+          
         screamData.comments = [];
-        data.forEach((doc) => { 
+        data.forEach((doc) => {
           screamData.comments.push(doc.data());
+          console.log(doc.data())
         });
-        console.log(screamData)
         return res.json(screamData);
       })
-   
       .catch((err) => {
         console.error(err);
         res.status(500).json({ error: err.code });
       });
-  }
+  };
+
+  //    db
+//    .collection('comments')
+//    .get()
+//    .then(data => {
+//     let comments = []
+//     data.forEach(doc => {
+//         comments.push(
+//             doc.data()
+//         );
+//     });
+//     return res.json(comments);
+// })
