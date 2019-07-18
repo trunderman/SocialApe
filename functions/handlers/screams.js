@@ -12,7 +12,11 @@ exports.getAllScreams = (request, response) => {
             screamId: doc.id,
             body: doc.data().body,
             userHandle: doc.data().userHandle,
-            createdAt: doc.data().createdAt
+            createdAt: doc.data().createdAt,
+            commentCount: doc.data().commentCount,
+            likeCount: doc.data().likeCount,
+            userImage: doc.data().userImage
+
         });
     });
     return response.json(screams);
@@ -80,7 +84,7 @@ exports.postOneScream = (req, res) => {
  //comment on scream
 
  exports.commentOnScream = (req, res) => {
-  if(req.body.body == '') return res.status(400).json({error: 'must not be empty'})
+  if(req.body.body == '') return res.status(400).json({comment: 'must not be empty'})
  
  const newComment = {
    body: req.body.body,

@@ -55,7 +55,7 @@ exports.signup = (req, res) => {
         if(err.code === 'auth/email-already-in-use'){
             return res.status(400).json({email: "Email is already in use"})
         } else {
-        return res.status(500).json({error: err.code});
+        return res.status(500).json({general: 'something went wrong, please try again'});
         }
     })
 }
@@ -79,10 +79,9 @@ exports.login = (req, res) => {
     })
     .catch((err) => {
         console.error(err)
-        if(err.code === 'auth/wrong-password'){
+        
         return res.status(403).json({general: 'Wrong credentials please try again'})
-        }else
-        return res.status(500).json({error: err.code})
+       
     })
 }
 
@@ -99,8 +98,46 @@ exports.addUserDetails = (req, res) => {
         })
 }
 
-//get own user details
 
+//get any user details
+exports.getUserDetails = (req, res) => {
+    let userData = {};
+    db.doc(`/users/${req.params.handle}`)
+      .get()
+      .then((doc) => {
+        if (doc.exists) {
+          userData.user = doc.data();
+          return db
+            .collection('screams')
+            .where('userHandle', '==', req.params.handle)
+            .orderBy('createdAt', 'desc')
+            .get();
+        } else {
+          return res.status(404).json({ error: 'User not found' });
+        }
+      })
+      .then((data) => {
+        userData.screams = [];
+        data.forEach((doc) => {
+          userData.screams.push({
+            body: doc.data().body,
+            createdAt: doc.data().createdAt,
+            userHandle: doc.data().userHandle,
+            userImage: doc.data().userImage,
+            likeCount: doc.data().likeCount,
+            commentCount: doc.data().commentCount,
+            screamId: doc.id
+          });
+        });
+        return res.json(userData);
+      })
+      .catch((err) => {
+        console.error(err);
+        return res.status(500).json({ error: err.code });
+      });
+  };
+
+//get own user details
 exports.getAuthenticatedUser = (req, res) => {
     let userData = {};
     db.doc(`/users/${req.user.handle}`)
@@ -183,6 +220,7 @@ exports.uploadImage = (req, res) => {
             Math.random() * 1000000000000
           ).toString()}.${imageExtension}`;
           console.log(imageFileName)
+          
 
         const filepath = path.join(os.tmpdir(), imageFileName);
         imageToBeUploaded= { filepath, mimetype}
@@ -218,4 +256,20 @@ exports.uploadImage = (req, res) => {
         })
     });
     busboy.end(req.rawBody);
+}
+
+exports.markNotificationsRead = (req, res) => {
+    let batch = db.batch()
+    req.body.forEach(notificationId => {
+        const notification = db.doc(`/notifications/${notificationId}`)
+        batch.update(notification, {read: true})
+    })
+    batch.commit()
+    .then(() => {
+        return res.json({message: 'Notifications marked as read'})
+    })
+    .catch(err => {
+        console.error(err)
+        return res.status(500).json({error: err.code})
+    })
 }
